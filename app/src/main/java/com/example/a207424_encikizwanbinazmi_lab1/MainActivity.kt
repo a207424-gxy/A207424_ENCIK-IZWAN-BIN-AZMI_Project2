@@ -32,12 +32,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavHostController
 
 // 定义“一组固定的选项”
 enum class SecondLifeScreen {
     Home,
     Sell,
-    Profile
+    Profile,
+    SDGImpact, // 新增：SDG 影响页
+    ProductDetail // 新增：商品详情页
 }
 
 class MainActivity : ComponentActivity() {
@@ -59,7 +62,8 @@ class MainActivity : ComponentActivity() {
                         BottomNavigationBar(
                             onHomeClick = { navController.navigate(SecondLifeScreen.Home.name) },
                             onSellClick = { navController.navigate(SecondLifeScreen.Sell.name) },
-                            onProfileClick = { navController.navigate(SecondLifeScreen.Profile.name) }
+                            onProfileClick = { navController.navigate(SecondLifeScreen.Profile.name) },
+                            onSDGClick = { navController.navigate(SecondLifeScreen.SDGImpact.name) }
                         )
                     }
                 ) { innerPadding ->
@@ -75,7 +79,8 @@ class MainActivity : ComponentActivity() {
                             // 传入 viewModel 中的数据
                             SecondLifeHome(
                                 sellCount = uiState.sellCount,
-                                productList = uiState.productList
+                                productList = uiState.productList,
+                                navController = navController
                             )
                         }
 
@@ -95,6 +100,23 @@ class MainActivity : ComponentActivity() {
                         composable(route = SecondLifeScreen.Profile.name) {
                             ProfileScreen(sellCount = uiState.sellCount)
                         }
+                        // 页面四：SDG Impact 页面
+                        composable(route = SecondLifeScreen.SDGImpact.name) {
+                            SDGImpactScreen()
+                        }
+
+                        // 页面五：商品详情页
+                        composable(route = "${SecondLifeScreen.ProductDetail.name}/{index}") { backStackEntry ->
+                            val index = backStackEntry.arguments?.getString("index")?.toIntOrNull() ?: 0
+                            val product = uiState.productList.getOrNull(index)
+
+                            if (product != null) {
+                                ProductDetailScreen(
+                                    product = product,
+                                    onNavigateBack = { navController.popBackStack() }
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -103,7 +125,7 @@ class MainActivity : ComponentActivity() {
 }
 @Composable
 //sellCount 从外部传进来（MainActivity）
-fun SecondLifeHome(sellCount: Int,productList: List<Product>) {
+fun SecondLifeHome(sellCount: Int,productList: List<Product>,navController: NavHostController) {
     val scrollState = rememberScrollState()
     var searchQuery by remember { mutableStateOf("") }
     var showMessage by remember { mutableStateOf(false) }
@@ -192,26 +214,37 @@ fun SecondLifeHome(sellCount: Int,productList: List<Product>) {
         )
 
         // 在 SecondLifeHome 内部
+        // 在 SecondLifeHome 内部
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-            // 直接使用从 ViewModel 传下来的 productList
-            productList.chunked(2).forEach { pair ->
+            productList.chunked(2).forEachIndexed { rowIndex, pair ->
                 Row(modifier = Modifier.fillMaxWidth()) {
-                    // pair[0] 现在是一个 Product 对象，直接访问它的属性
+                    // 第一个商品
+                    val index1 = rowIndex * 2
+                    val product1 = pair[0]
                     ProductCard(
-                        title = pair[0].title,
-                        price = pair[0].price,
-                        imageRes = pair[0].imageRes,
-                        modifier = Modifier.weight(1f)
+                        title = product1.title,
+                        price = product1.price,
+                        imageRes = product1.imageRes,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            // 导航到详情页
+                            navController.navigate("${SecondLifeScreen.ProductDetail.name}/$index1")
+                        }
                     )
 
                     Spacer(modifier = Modifier.width(8.dp))
 
                     if (pair.size > 1) {
+                        val index2 = rowIndex * 2 + 1
+                        val product2 = pair[1]
                         ProductCard(
-                            title = pair[1].title,
-                            price = pair[1].price,
-                            imageRes = pair[1].imageRes,
-                            modifier = Modifier.weight(1f)
+                            title = product2.title,
+                            price = product2.price,
+                            imageRes = product2.imageRes,
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                navController.navigate("${SecondLifeScreen.ProductDetail.name}/$index2")
+                            }
                         )
                     } else {
                         Spacer(modifier = Modifier.weight(1f))
@@ -225,17 +258,20 @@ fun SecondLifeHome(sellCount: Int,productList: List<Product>) {
 }
 
 @Composable
-fun ProductCard(title: String, price: String, imageRes: Int, modifier: Modifier) {
+fun ProductCard(
+    title: String,
+    price: String,
+    imageRes: Int,
+    modifier: Modifier,
+    onClick: () -> Unit
+) {
     var isFavorite by remember { mutableStateOf(false) }
-    // L3新展开状态
     var expanded by remember { mutableStateOf(false) }
 
     ElevatedCard(
-        //接收外部传进来的布局规则
         modifier = modifier
             .padding(vertical = 4.dp)
-            .clickable { expanded = !expanded } // 点击切换展开
-            .animateContentSize( // 平滑改变高度
+            .animateContentSize(
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioLowBouncy,
                     stiffness = Spring.StiffnessLow
@@ -244,7 +280,8 @@ fun ProductCard(title: String, price: String, imageRes: Int, modifier: Modifier)
         shape = MaterialTheme.shapes.medium
     ) {
         Column {
-            Box {
+            // 1. 图片区域：点击跳转到详情页
+            Box(modifier = Modifier.clickable { onClick() }) {
                 Image(
                     painter = painterResource(id = imageRes),
                     contentDescription = null,
@@ -253,6 +290,7 @@ fun ProductCard(title: String, price: String, imageRes: Int, modifier: Modifier)
                         .height(120.dp),
                     contentScale = ContentScale.Crop
                 )
+                // 收藏按钮保持原样
                 IconButton(
                     onClick = { isFavorite = !isFavorite },
                     modifier = Modifier.align(Alignment.TopEnd)
@@ -265,7 +303,12 @@ fun ProductCard(title: String, price: String, imageRes: Int, modifier: Modifier)
                 }
             }
 
-            Column(modifier = Modifier.padding(12.dp)) {
+            // 2. 文字区域：点击切换
+            Column(
+                modifier = Modifier
+                    .clickable { expanded = !expanded }
+                    .padding(12.dp)
+            ) {
                 Text(text = title, style = MaterialTheme.typography.titleMedium)
                 Text(
                     text = price,
@@ -273,12 +316,18 @@ fun ProductCard(title: String, price: String, imageRes: Int, modifier: Modifier)
                     style = MaterialTheme.typography.labelLarge
                 )
 
-                // 展开后显示的详细信息
                 if (expanded) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "Condition: 9/10. Great choice for sustainable living! This pre-loved item helps reduce waste.",
                         style = MaterialTheme.typography.bodySmall
+                    )
+                    // 提示用户可以查看详情
+                    Text(
+                        text = "Click image for more details >",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.padding(top = 4.dp)
                     )
                 }
             }
@@ -290,7 +339,8 @@ fun ProductCard(title: String, price: String, imageRes: Int, modifier: Modifier)
 fun BottomNavigationBar(
     onHomeClick: () -> Unit,
     onSellClick: () -> Unit,
-    onProfileClick: () -> Unit
+    onProfileClick: () -> Unit,
+    onSDGClick: () -> Unit
 ) {
     Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 8.dp) {
         Row(
@@ -300,10 +350,19 @@ fun BottomNavigationBar(
         ) {
             // 首页图标
             IconButton(onClick = onHomeClick) {
-                Icon(Icons.Default.Search, "Home")
+                Icon(Icons.Default.Home, "Home") // 建议改回 Home 图标更直观
             }
 
-            // S钮
+            // 2.SDG Impact 按钮
+            IconButton(onClick = onSDGClick) {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = "SDG Impact",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            // Sell 按钮
             FloatingActionButton(
                 onClick = onSellClick,
                 containerColor = MaterialTheme.colorScheme.primary,
@@ -375,5 +434,56 @@ fun BottomNavItem(icon: ImageVector, label: String, isSelected: Boolean = false)
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(icon, label, tint = color)
         Text(label, style = MaterialTheme.typography.labelSmall, color = color)
+    }
+}
+
+@Composable
+fun SDGImpactScreen() {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("SDG 12: Responsible Consumption", style = MaterialTheme.typography.headlineMedium)
+        Spacer(modifier = Modifier.height(16.dp))
+
+        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("The Problem:", fontWeight = FontWeight.Bold)
+                Text("Excessive waste from discarded electronics and fashion in Malaysia.")
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("Our Solution:", fontWeight = FontWeight.Bold)
+                Text("SecondLife encourages re-selling pre-loved items to extend product lifecycles.")
+            }
+        }
+    }
+}
+
+@Composable
+fun ProductDetailScreen(product: Product, onNavigateBack: () -> Unit) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        Box {
+            Image(
+                painter = painterResource(id = product.imageRes),
+                contentDescription = null,
+                modifier = Modifier.fillMaxWidth().height(300.dp),
+                contentScale = ContentScale.Crop
+            )
+            IconButton(onClick = onNavigateBack) {
+                Icon(Icons.Default.ArrowBack, "Back", tint = Color.White)
+            }
+        }
+
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(product.title, style = MaterialTheme.typography.headlineLarge)
+            Text(product.price, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.headlineSmall)
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("Description:", fontWeight = FontWeight.Bold)
+            Text(product.description)
+
+            Spacer(modifier = Modifier.weight(1f))
+            Button(onClick = { /* 购买逻辑 */ }, modifier = Modifier.fillMaxWidth()) {
+                Text("Contact Seller")
+            }
+        }
     }
 }
