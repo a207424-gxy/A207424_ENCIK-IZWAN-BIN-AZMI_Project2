@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "120770876814",
+    "project_id": "secondlife-38427",
+    "storage_bucket": "secondlife-38427.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:120770876814:android:97fbb8d0b48d78129f00df",
+        "android_client_info": {
+          "package_name": "com.example.a207424_encikizwanbinazmi_lab1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDyy4o0KTThygZ6BtXxoDtDmfPt1s9sc6E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -75,4 +75,15 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     implementation("androidx.navigation:navigation-compose:2.7.7")
+
+    // 1. Retrofit (网络请求)
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+
+    // 2. Firebase (引入 BOM 方便管理版本)
+    implementation(platform("com.google.firebase:firebase-bom:33.1.0"))
+    implementation("com.google.firebase:firebase-firestore-ktx")
+
+    // 3. 谷歌位置服务 (用于获取 GPS 定位)
+    implementation("com.google.android.gms:play-services-location:21.2.0")
 }
