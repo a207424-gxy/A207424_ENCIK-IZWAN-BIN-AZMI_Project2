@@ -34,13 +34,16 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.google.android.gms.location.LocationServices
 import com.google.firebase.firestore.FirebaseFirestore
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.filled.Refresh
+import kotlinx.coroutines.tasks.await
 
-// ─── 1. EXTENDED NAVIGATION SCREENS (7 SCREENS REQUIRED) ───
 enum class SecondLifeScreen {
     Home, Sell, Profile, SDGImpact, ProductDetail, EcoQuotes, CommunityMarket
 }
 
-// ─── 2. MAIN ACTIVITY CONTROL ───
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -126,7 +129,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// ─── 3. SCREENS IMPLEMENTATION ────────────────────────────────────────────────
 
 @Composable
 fun SecondLifeHome(
@@ -169,7 +171,7 @@ fun SecondLifeHome(
             }
         }
 
-        // 🚀 快捷入口：向导师演示新增的第 6 和第 7 个界面（调用你的独立 Retrofit 模块）
+
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -293,7 +295,6 @@ fun ProductCard(title: String, price: String, imageRes: Int, modifier: Modifier,
     }
 }
 
-// ─── 4. SCREEN 6: 完美对接你的独立 RetrofitClient 模块 ───
 @Composable
 fun EcoQuotesScreen() {
     var tips by remember { mutableStateOf<List<EcoNotice>>(emptyList()) }
@@ -333,7 +334,6 @@ fun EcoQuotesScreen() {
     }
 }
 
-// ─── 5. SCREEN 2 & HARDWARE PILLAR: GPS 传感器发布 ───
 @SuppressLint("MissingPermission")
 @Composable
 fun SellScreen(onNavigateBack: () -> Unit, onConfirmSell: (String, String, String) -> Unit) {
@@ -353,14 +353,14 @@ fun SellScreen(onNavigateBack: () -> Unit, onConfirmSell: (String, String, Strin
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 🛠 传感器硬件读取组件
+        //传感器硬件读取组件
         ElevatedCard(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
             Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(hardwareLocation, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
                     onClick = {
-                        // 🚀 纯粹的传感器异步监听：完全听从硬件回调，不搞任何主线程强行刷新
+                        //纯粹的传感器异步监听：完全听从硬件回调，不搞任何主线程强行刷新
                         fusedLocationProviderClient.lastLocation
                             .addOnSuccessListener { location ->
                                 if (location != null) {
@@ -386,7 +386,7 @@ fun SellScreen(onNavigateBack: () -> Unit, onConfirmSell: (String, String, Strin
         Button(
             onClick = {
                 if (itemName.isNotBlank() && itemPrice.isNotBlank()) {
-                    // 🚀 Firebase 崩溃保护：套上 try-catch 金钟罩，防住未初始化导致的闪退
+                    //Firebase 崩溃保护：套上 try-catch 金钟罩，防住未初始化导致的闪退
                     try {
                         val cloudInstance = FirebaseFirestore.getInstance()
                         val dataPayload = hashMapOf(
@@ -414,59 +414,75 @@ fun SellScreen(onNavigateBack: () -> Unit, onConfirmSell: (String, String, Strin
     }
 }
 
-// ─── 6. SCREEN 7: CLOUD MARKET SCREEN (带有安全保护的完美版本) ───
 @Composable
 fun CommunityMarketScreen() {
     var firebaseData by remember { mutableStateOf<List<Map<String, Any>>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var refreshKey by remember { mutableStateOf(0) }
+    var errorMessage by remember { mutableStateOf<String?>(null) } // 增加错误提示，方便排查
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refreshKey) {
+        isLoading = true
+        errorMessage = null
         try {
-            // 🔒 用 try-catch 把 Firebase 包裹起来，彻底断绝因未初始化导致的闪退！
-            FirebaseFirestore.getInstance().collection("shared_products").get()
-                .addOnSuccessListener { querySnapshot ->
-                    firebaseData = querySnapshot.documents.map { it.data ?: emptyMap() }
-                }
+            // 使用 await() 让异步转换为挂起，此时 try-catch 真正起作用
+            val querySnapshot = FirebaseFirestore.getInstance()
+                .collection("shared_products")
+                .get()
+                .await()
+
+            firebaseData = querySnapshot.documents.mapNotNull { it.data }
         } catch (e: Exception) {
-            // 💡 答辩神技：如果 Firebase 没有联网初始化成功，自动加载高仿真本地模拟数据
-            // 这样页面不仅不会退出，还能向导师丝滑演示列表渲染的效果！
-            firebaseData = listOf(
-                mapOf(
-                    "title" to "Dell Monitor 24-inch (Cloud Sync)",
-                    "price" to "RM 350",
-                    "geo_source" to "Cloud Broadcast: From Cyberjaya Node"
-                ),
-                mapOf(
-                    "title" to "Vintage Leather Jacket",
-                    "price" to "RM 85",
-                    "geo_source" to "Cloud Broadcast: From Bangi Campus"
-                ),
-                mapOf(
-                    "title" to "Mechanical Keyboard K87",
-                    "price" to "RM 120",
-                    "geo_source" to "Cloud Broadcast: From Cheras User"
-                )
-            )
+            e.printStackTrace()
+            errorMessage = e.localizedMessage ?: "Unknown error occurred"
+        } finally {
+            // 无论成功还是失败，最终都会执行，确保 loading 结束
+            isLoading = false
         }
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("Firebase Cloud Market", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Firebase Cloud Market", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+
+            // 改进：正在加载时，按钮不要禁用，或者允许用户在超时后重试
+            IconButton(onClick = { refreshKey++ }, enabled = !isLoading) {
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                }
+            }
+        }
         Text("Real-time public database shared items", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.outline)
         Spacer(modifier = Modifier.height(16.dp))
 
-        if (firebaseData.isEmpty()) {
+        // 错误信息提示
+        if (errorMessage != null) {
+            Box(modifier = Modifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.Center) {
+                Text("Error: $errorMessage", color = MaterialTheme.colorScheme.error)
+            }
+        }
+
+        if (!isLoading && firebaseData.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No shared cloud items or loading...", style = MaterialTheme.typography.bodyLarge)
+                Text("No shared cloud items yet.", style = MaterialTheme.typography.bodyLarge)
             }
         } else {
-            // 🚀 循环渲染卡片
-            firebaseData.forEach { cloudItem ->
-                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(cloudItem["title"]?.toString() ?: "Unknown Item", style = MaterialTheme.typography.titleLarge)
-                        Text(cloudItem["price"]?.toString() ?: "RM 0", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(cloudItem["geo_source"]?.toString() ?: "No Location Tag", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+            // 优化：列表建议使用 LazyColumn，比 forEach 性能更好，防止数据多时卡顿
+            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                items(firebaseData) { cloudItem ->
+                    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(cloudItem["title"]?.toString() ?: "Unknown Item", style = MaterialTheme.typography.titleLarge)
+                            Text(cloudItem["price"]?.toString() ?: "RM 0", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(cloudItem["geo_source"]?.toString() ?: "No Location Tag", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                        }
                     }
                 }
             }

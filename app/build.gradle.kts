@@ -1,6 +1,8 @@
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    id("com.google.gms.google-services")
     kotlin("android")
     kotlin("kapt")
 }
@@ -86,4 +88,7 @@ dependencies {
 
     // 3. 谷歌位置服务 (用于获取 GPS 定位)
     implementation("com.google.android.gms:play-services-location:21.2.0")
+
+    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
+    implementation("com.google.firebase:firebase-firestore")
 }
